@@ -1,0 +1,14 @@
+[project]
+name = "datachecker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "actvibmodules",
+    "pyqtgraph>=0.13.7",
+    "pyside6>=6.8.0",
+]
+
+[tool.uv.sources]
+actvibmodules = { git = "https://github.com/eduardobatista/ActVibModules" }
