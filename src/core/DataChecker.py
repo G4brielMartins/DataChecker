@@ -1,9 +1,7 @@
 """
-Biblioteca para plot e verificação de integridade de dados gerados com o firmware ActVib.
+Módulo para plot e verificação de integridade de dados gerados com o firmware ActVib.
 """
-
-import os
-from typing import Optional, TypeAlias
+from typing import Optional, TypeAlias, Tuple, Sequence
 
 import numpy as np
 import pandas as pd
@@ -12,132 +10,103 @@ from ActVibModules.ActVibSystem import ActVibData
 from ActVibModules.Adaptive import FIRNLMS
 from ActVibModules.DSPFuncs import easyFourier
 
-Atuador: TypeAlias = int
+Atuador: TypeAlias = str
+Amplitude: TypeAlias = float
+Tempo: TypeAlias = float
+Hz: TypeAlias = float
 
-def atuadores_disponiveis(data: ActVibData | pd.DataFrame) -> list[Atuador]:
+def atuadores_disponiveis(data: ActVibData | pd.DataFrame) -> Tuple[Atuador]:
     """
     Identifica quais atuadores apresentam dados disponíveis.
 
     Parameters
     ----------
-    data : ActVibData or pd.DataFrame
+    data : ActVibData | pd.DataFrame
         Dados de vibração já importados importados.
 
     Returns
     -------
-    list[Atuador]
-        
+    Tuple[Atuador]
+        Lista com os atuadores disponíveis para acesso - ['dac1', 'dac2'].
     """
-    dac_columns = [name.startswith('dac') for name in data.columns]
+    dac_columns = np.array([name for name in data.columns if name.startswith('dac')])
     dac_data = data.loc[:, dac_columns]
     
-    dac_indices = np.array(range(1, len(dac_data.columns) + 1))
+    dacs_disponiveis = dac_columns[dac_data.any()]
     
-    return dac_indices[dac_data.any()]
-
-print(atuadores_disponiveis(ActVibData('data/R1_A12_0.15.feather')))
-
-class ConfigError(Exception):
-    # Erro utilizado pela classe DataHandler
-    def __init__(self, path: str|os.PathLike):
-        mensagem = "O objeto não está configurado. Defina o dac e imu de interesse utilizando (self.set_config)."
-        super().__init__(mensagem)
+    return dacs_disponiveis
 
 
-class DataHandler():
-    def __init__(self, path:str|os.PathLike, *, dac:Optional[str]= None, imu:Optional[str]= None):
-        """
-        Classe para armazenar informações referentes ao grupo de dados e facilitar sua manipulação.
-
-        Parameters
-        ----------
-        path : str | os.PathLike
-            Caminho do arquivo feather que contém os dados.
-        dac : Optional[str], optional
-            dac de interesse na análise
-        imu : Optional[str], optional
-            imu e a variável de interesse na análise - Ex.: 'imu2accz'
-        
-        * dac e imu podem ser fornecidos posteriormentes com set_config.
-          Algumas funções ficam desabilitadas até a devida configuração do dac e imu.
-        """
-        self.name = os.path.basename(path)
-        self.data = ActVibData(path)
-        self.dac = dac
-        self.imu = imu
-    
-    def is_config(self) -> bool:
-        """
-        Verifica se dac e imu estão configurados.
-
-        Returns
-        -------
-        bool
-            True se está configurado.
-        """        
-        return False if None in [self.dac, self.imu] else True
-
-    def set_config(self, dac:Optional[str]= None, imu:Optional[str]= None) -> None:
-        """
-        Atribui valores ao dac e imu.
-
-        Parameters
-        ----------
-        dac : Optional[str], optional
-            Novo dac a ser utilizado.
-        imu : Optional[str], optional
-            Novos imu e variável a serem utilizados.
-        """        
-        if dac is not None:
-            self.dac = dac
-        if imu is not None:
-            self.imu = imu
-    
-    def generate_fir(self) -> None:
-        """
-        Calcula a resposta ao impulso e armazena em (self.fir).
-        * dac e imu precisam estar configurados.
-        """                
-        if self.is_config():
-                self.fir = FIRNLMS(memorysize=2000)
-                x = self.data[self.dac].values - self.data[self.dac].mean()
-                y = self.data[self.imu].values - self.data[self.imu].mean()
-                self.fir.run(x,y)
-        else:
-            raise ConfigError
-    
-    def generate_fir_freq(self) -> None:
-        """
-        Calcula a resposta ao impulso no domínio da frequência e armazena em (self.fir_freq).
-        * dac e imu precisam estar configurados.
-        """
-        try:
-            self.fir_freq = easyFourier(self.fir.ww,fs=416)
-        except AttributeError:
-            self.generate_fir()
-            self.generate_fir_freq()
-
-
-def drive_importer(url: str, *, out_folder: str = "Dados", quiet: bool = True) -> str:
-    """
-    Importa uma pasta do Google Drive para o diretório local 'Dados/'.
+def get_ir(resposta: Sequence[float], estimulo: Sequence[float], amostragem: Optional[Hz] = None, 
+            *, memorysize: int = 2000, **firlms_kwargs) -> Tuple[Amplitude, Tempo]:
+    """Calcula a resposta ao impulso da (resposta) em função do (estímulo).
 
     Parameters
     ----------
-    url : str
-        Link da pasta do Google Drive.
-        * O arquivo deve estar com acesso 'Qualquer pessoa com o link'
+    resposta : Sequence[float]
+        Sinal de saída do sistema.
+    estimulo : Sequence[float]
+        Sinal de entrada do sistema.
+    amostragem : float, optional
+        Frequência de amostragem dos dados em Hz.
+        Por padrão retorna o índice numérico da amostra.
+    frlms_kwargs : optional
+        Argumentos extras para a função FIRLMS.
+
+    Returns
+    -------
+    Tuple[Amplitude, Tempo]
+        Par Amplitude x Tempo que compõe a resposta ao impulso do sistema.
     """
-    from gdown import download_folder
+    fir = FIRNLMS(memorysize=memorysize, **firlms_kwargs)
+    x: list[float] = estimulo - np.mean(estimulo)
+    y: list[float] = resposta - np.mean(resposta)
+    fir.run(x,y)
     
-    if not os.path.exists(out_folder):
-        os.mkdir(out_folder)
+    time_index: list[float] = np.array(range(len(fir.ww))) / amostragem
     
-    raiz = os.getcwd()
-    os.chdir(out_folder)
-    paths = download_folder(url, quiet=quiet)
-    os.chdir(raiz)
+    return fir.ww, time_index
 
-    folder_path = os.path.dirname(os.path.abspath(paths[0]))
 
-    return folder_path
+def get_fr_from_ir(ir: list[Amplitude, Tempo]) -> Tuple[Amplitude, Hz]:
+    """Calcula a resposta em frequência de uma resposta ao impulso.
+    Define a frequência de amostragem a partir do período entre amostras.
+
+    Parameters
+    ----------
+    ir : list[Amplitude, Tempo]
+        Amplitudes da resposta ao impulso.
+
+    Returns
+    -------
+    list[Amplitude, Hz]
+        _description_
+    """
+    amostragem = 1.0 / (ir[1][1] - ir[1][0])
+    
+    return easyFourier(np.array(ir[0]), fs=amostragem)
+
+
+def get_fr(resposta: Sequence[float], estimulo: Sequence[float], amostragem: Hz, 
+            *, memorysize: int = 2000, **firlms_kwargs) -> Tuple[Amplitude, Tempo]:
+    """Calcula a resposta em frequência da (resposta) em função do (estímulo).
+
+    Parameters
+    ----------
+    resposta : Sequence[float]
+        Sinal de saída do sistema.
+    estimulo : Sequence[float]
+        Sinal de entrada do sistema.
+    amostragem : float, optional
+        Frequência de amostragem dos dados em Hz.
+    frlms_kwargs : optional
+        Argumentos extras para a função FIRLMS.
+
+    Returns
+    -------
+    list[Amplitude, Hz]
+        Par Amplitude x Frequência que compõe a resposta ao impulso do sistema.
+    """
+    ir = get_ir(resposta, estimulo, amostragem, memorysize=memorysize, **firlms_kwargs)
+    
+    return get_fr_from_ir(ir)
