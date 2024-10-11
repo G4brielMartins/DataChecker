@@ -1,6 +1,7 @@
 """
 Módulo para plot e verificação de integridade de dados gerados com o firmware ActVib.
 """
+import os
 from typing import Optional, TypeAlias, Tuple, Sequence
 
 import numpy as np
@@ -10,12 +11,13 @@ from ActVibModules.ActVibSystem import ActVibData
 from ActVibModules.Adaptive import FIRNLMS
 from ActVibModules.DSPFuncs import easyFourier
 
-Atuador: TypeAlias = str
+Atuador_DAC: TypeAlias = int
+Sensor_IMU: TypeAlias = int
 Amplitude: TypeAlias = float
 Tempo: TypeAlias = float
 Hz: TypeAlias = float
 
-def atuadores_disponiveis(data: ActVibData | pd.DataFrame) -> Tuple[Atuador]:
+def dacs_disponiveis(data: ActVibData | pd.DataFrame) -> Tuple[Atuador_DAC]:
     """
     Identifica quais atuadores apresentam dados disponíveis.
 
@@ -29,12 +31,18 @@ def atuadores_disponiveis(data: ActVibData | pd.DataFrame) -> Tuple[Atuador]:
     Tuple[Atuador]
         Lista com os atuadores disponíveis para acesso - ['dac1', 'dac2'].
     """
-    dac_columns = np.array([name for name in data.columns if name.startswith('dac')])
+    dac_columns = np.array([name.startswith('dac') for name in data.columns])
     dac_data = data.loc[:, dac_columns]
     
-    dacs_disponiveis = dac_columns[dac_data.any()]
+    dacs_disponiveis = np.array(range(len(dac_data.columns)))[dac_data.any()] + 1
     
     return dacs_disponiveis
+
+print(dacs_disponiveis(ActVibData('data/R1_A1_0.15.feather')))
+
+
+def imus_disponiveis(data: ActVibData|pd.DataFrame):
+    imu_columns = np.array([name for name in data.columns if name.startswith()])
 
 
 def get_ir(resposta: Sequence[float], estimulo: Sequence[float], amostragem: Optional[Hz] = None, 
@@ -110,3 +118,8 @@ def get_fr(resposta: Sequence[float], estimulo: Sequence[float], amostragem: Hz,
     ir = get_ir(resposta, estimulo, amostragem, memorysize=memorysize, **firlms_kwargs)
     
     return get_fr_from_ir(ir)
+
+class DataHandler():
+    def __init__(self, data_path: str):
+        self.file_name = os.path.basename(data_path)
+        self.data = ActVibData(data_path)
