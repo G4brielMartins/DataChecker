@@ -1,15 +1,10 @@
 from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QMainWindow
 
-from ...core.FileManager import FileManager
+from ..dialogs.FileDialog import ImportFileDialog
 
 class ActImportFile(QAction):
     def __init__(self, parent):
-        super().__init__("Importar", parent)
-        
-        self.triggered.connect(self.import_files)
-    
-    def import_files(self, file_paths):
-        file_mng = FileManager()
-        file_mng.add_files(file_paths)
-        
-        print(file_mng[:])
+        super().__init__("Importar...", parent)
+        import_file_dialog = ImportFileDialog(parent)
+        self.triggered.connect(import_file_dialog.show)

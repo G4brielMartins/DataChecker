@@ -1,10 +1,10 @@
 import os
-from typing import Optional, TypeAlias
+from typing import Optional, TypeAlias, overload
 
 import numpy as np
 from ActVibModules.ActVibSystem import ActVibData
 
-import Utils as ut
+from . import Utils as ut
 
 Atuador_DAC: TypeAlias = int
 Sensor_IMU: TypeAlias = int
@@ -61,12 +61,22 @@ class FileManager:
     def __init__(self) -> None:
         self.files = {}
     
-    def __getitem__(self, key: str|int|slice) -> FileEntry|list[FileEntry]:
+    @overload
+    def __getitem__(self, key: str|int) -> FileEntry: ...
+    @overload
+    def __getitem__(self, key: slice) -> list[FileEntry]: ...
+    def __getitem__(self, key):
         match key:
             case str():
                 return self.files[key]
             case int() | slice():
                 return list(self.files.values())[key]
+    
+    def __len__(self) -> int:
+        return len(self.files.values())
+    
+    def count_files(self) -> int:
+        return len(self)
     
     def add_files(self, file_paths: str|list[str]) -> None:
         if isinstance(file_paths, list):
