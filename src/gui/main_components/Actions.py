@@ -1,11 +1,15 @@
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMainWindow
+
+from ...core.FileManager import FileManager
 
 class ActImportFile(QAction):
-    def __init__(self, parent: QMainWindow):
+    def __init__(self, parent):
         super().__init__("Importar", parent)
         
-        self.triggered.connect(self.import_file)
+        self.triggered.connect(self.import_files)
     
-    def import_file(self):
-        feather_paths = 
+    def import_files(self, file_paths):
+        file_mng = FileManager()
+        file_mng.add_files(file_paths)
+        
+        print(file_mng[:])
