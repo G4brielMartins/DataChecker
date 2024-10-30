@@ -1,7 +1,6 @@
 """
 Módulo para plot e verificação de integridade de dados gerados com o firmware ActVib.
 """
-import os
 from typing import Optional, TypeAlias, Tuple, Sequence
 
 import numpy as np
@@ -38,11 +37,11 @@ def dacs_disponiveis(data: ActVibData | pd.DataFrame) -> Tuple[Atuador_DAC]:
     
     return dacs_disponiveis
 
-print(dacs_disponiveis(ActVibData('data/R1_A1_0.15.feather')))
 
-
-def imus_disponiveis(data: ActVibData|pd.DataFrame):
-    imu_columns = np.array([name for name in data.columns if name.startswith()])
+def imus_disponiveis(data: ActVibData|pd.DataFrame) -> Tuple[int]:
+    imus = {name[3] for name in data.columns if name.startswith('imu')}
+    
+    return list(imus)
 
 
 def get_ir(resposta: Sequence[float], estimulo: Sequence[float], amostragem: Optional[Hz] = None, 
@@ -118,8 +117,3 @@ def get_fr(resposta: Sequence[float], estimulo: Sequence[float], amostragem: Hz,
     ir = get_ir(resposta, estimulo, amostragem, memorysize=memorysize, **firlms_kwargs)
     
     return get_fr_from_ir(ir)
-
-class DataHandler():
-    def __init__(self, data_path: str):
-        self.file_name = os.path.basename(data_path)
-        self.data = ActVibData(data_path)
