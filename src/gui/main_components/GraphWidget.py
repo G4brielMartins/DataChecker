@@ -1,6 +1,5 @@
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtGui
-import sys
 
 class GraphWidget(pg.PlotWidget):
     def __init__(self, x, y, x_label="", y_label=""):
@@ -10,15 +9,13 @@ class GraphWidget(pg.PlotWidget):
         self.setBackground('white')
 
         # Ajustar as margens da área de plotagem
-        self.setContentsMargins(50, 50, 50, 50)  # Margens: esquerda, cima, direita, baixo
+        self.setContentsMargins(50, 50, 50, 50)
 
-        # Plotar os dados
-        self.plot(x, y, pen=pg.mkPen('blue'))
+        # Plotar os dados com uma linha mais delicada (espessura reduzida para 1)
+        self.plot(x, y, pen=pg.mkPen('blue', width=1))
 
-        # Adicionar rótulos estilizados aos eixos (mais bonitinhos)
+        # Adicionar rótulos estilizados aos eixos
         label_style = {'font-size': '17pt', 'font-family': 'Arial', 'font-weight': 'bold'}
-
-        # Ajustar o offset dos rótulos dos eixos
         self.setLabel('left', y_label, color='black', **label_style, offset=30)
         self.setLabel('bottom', x_label, color='black', **label_style, offset=30)
 
